@@ -205,6 +205,49 @@ if role == "BUYER":
             else:
                 st.error("Saldo tidak mencukupi untuk pembayaran ini.")
 
+if role == "SELLER":
+    st.title("Dashboard SELLER")
+    cursor.execute("SELECT course_id, course_name FROM courses ORDER BY course_name")
+    courses = cursor.fetchall()
+    course_dict = {course[0]: course[1] for course in courses}
+
+    st.subheader("Unggah Produk Baru")
+    selected_course_id = st.selectbox("Pilih Kategori Mata Kuliah", list(course_dict.keys()), format_func=lambda x: course_dict[x])
+    material_title = st.text_input("Judul")
+    material_content = st.text_input("Materi")
+    material_category = st.selectbox("Kategori Materi", ['Lecture Notes', 'Summaries', 'Assignments', 'Others'])
+    material_description = st.text_area("Deskripsi Materi")
+    material_price = st.number_input("Harga (Rp)", min_value=0)
+    file_material = st.file_uploader("Upload File Materi")
+    material_status = st.selectbox("Status", ["ACTIVE", "INACTIVE"])
+
+    if st.button("Unggah"):
+        if material_title and material_category and material_price and file_material and material_description and material_status and material_content:
+            file_path = f'/files/{file_material.name}'
+            file_size = len(file_material.getvalue())
+            cursor.execute("INSERT INTO materials (course_id, title, materi, category, description, file_path, file_size, price, seller_id, status, uploaded_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())",
+                           (selected_course_id, material_title, material_content, material_category, material_description, file_path, file_size, material_price, user_id, material_status))
+            db.commit()
+            st.success("Materi berhasil diunggah!")
+
+    # Fitur Saldo Seller
+    st.sidebar.subheader("💰 Saldo Anda")
+    cursor.execute("SELECT balance FROM wallets WHERE user_id = %s", (user_id,))
+    wallet_data = cursor.fetchone()
+    wallet_balance = wallet_data[0] if wallet_data else 0
+
+    st.sidebar.write(f"Saldo saat ini: Rp {wallet_balance}")
+
+    withdrawal_amount = st.sidebar.number_input("Jumlah Penarikan (Rp)", min_value=0.0, max_value=float(wallet_balance))
+    if st.sidebar.button("Ambil Saldo"):
+        if withdrawal_amount > 0 and withdrawal_amount <= wallet_balance:
+            cursor.execute("UPDATE wallets SET balance = balance - %s WHERE user_id = %s", (withdrawal_amount, user_id))
+            db.commit()
+            st.success("Penarikan saldo berhasil!")
+            st.rerun()
+        else:
+            st.error("Jumlah penarikan tidak valid atau saldo tidak mencukupi.")
+            
 # Tutup koneksi database
 cursor.close()
 db.close()
